@@ -22,6 +22,7 @@ _ADAPTIVE_PREFIXES = ("claude-opus-4-6", "claude-opus-4-7", "claude-opus-4-8",
 
 class DecisionEngine(Protocol):
     name: str
+    def complete(self, prompt: str) -> str: ...   # one raw LLM call → text
     def decide(self, prompt: str) -> Decision: ...
 
 
@@ -83,7 +84,7 @@ class ClaudeCLIEngine:
         self.binary = find_claude_binary()
         self.name = f"{model} (claude CLI / subscription)"
 
-    def decide(self, prompt: str) -> Decision:
+    def complete(self, prompt: str) -> str:
         result = subprocess.run(
             [self.binary, "-p", "--output-format", "json", "--model", self.model],
             input=prompt, capture_output=True, text=True, timeout=600,
@@ -104,7 +105,10 @@ class ClaudeCLIEngine:
                 f"claude CLI failed (exit {result.returncode}): "
                 f"{result.stderr[:300] or result.stdout[:300]}"
             )
-        return _parse(payload["result"], self.name)
+        return payload["result"]
+
+    def decide(self, prompt: str) -> Decision:
+        return _parse(self.complete(prompt), self.name)
 
 
 class AnthropicAPIEngine:
@@ -112,7 +116,7 @@ class AnthropicAPIEngine:
         self.model = model
         self.name = f"{model} (API)"
 
-    def decide(self, prompt: str) -> Decision:
+    def complete(self, prompt: str) -> str:
         import anthropic
 
         client = anthropic.Anthropic()
@@ -125,8 +129,10 @@ class AnthropicAPIEngine:
             messages=[{"role": "user", "content": prompt}],
             **kwargs,
         )
-        text = next(b.text for b in response.content if b.type == "text")
-        return _parse(text, self.name)
+        return next(b.text for b in response.content if b.type == "text")
+
+    def decide(self, prompt: str) -> Decision:
+        return _parse(self.complete(prompt), self.name)
 
 
 def create_engine(settings: Settings) -> DecisionEngine:

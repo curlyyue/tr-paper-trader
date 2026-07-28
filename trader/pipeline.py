@@ -79,8 +79,21 @@ class DailyPipeline:
         # 4. Decide
         print("Asking Claude for a decision ...")
         decision = self.engine.decide(prompt)
-        self.repo.record_decision(day, now_iso, decision.model_used, decision.raw_json, prompt)
+        dec_id = self.repo.record_decision(
+            day, now_iso, decision.model_used, decision.raw_json, prompt, lang="en"
+        )
         print(f"\nAnalysis: {decision.analysis}\n")
+
+        # Best-effort translation to 中文 for the dashboard's language toggle.
+        # Separate prompt, one extra LLM call; does NOT touch the decisions
+        # count, so it never consumes a daily LLM wake-up slot.
+        try:
+            from .translate import translate_decision
+            zh = translate_decision(self.engine, json.loads(decision.raw_json), "zh")
+            self.repo.save_translation(dec_id, json.dumps({"zh": zh}, ensure_ascii=False))
+            print("  (translated to 中文 for the dashboard)")
+        except Exception as e:
+            print(f"  [warn] translation skipped: {e}")
 
         # 5. Apply watchlist changes (discoveries = recommendations to the user).
         #    Additions must be priceable — guards against hallucinated tickers.

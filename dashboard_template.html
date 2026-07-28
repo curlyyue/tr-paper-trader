@@ -190,22 +190,26 @@ function render() {
     </div>
 
     <h2>${t("dec_title")}</h2>
-    ${a.decisions.map(d => `
+    ${a.decisions.map(d => {
+      const dc = d[LANG] || d.en || d.zh || {};   // agent content follows the language toggle
+      const orders = dc.orders || [];
+      const adds = (dc.watchlist_changes && dc.watchlist_changes.add) || [];
+      return `
       <div class="card">
         <span class="pill">${esc(d.created_at || d.date)}</span>
         <span class="pill">${esc(d.model || "")}</span>
-        <div class="decision"><b>${t("l_analysis")}</b><br>${esc(d.analysis)}</div>
-        ${d.reasoning ? `<details open><summary>${t("l_reasoning")}</summary>
-          <div class="decision">${esc(d.reasoning)}</div></details>` : ""}
-        ${d.memo ? `<div class="decision"><b>${t("l_memo")}</b><br>${esc(d.memo)}</div>` : ""}
-        ${d.orders.length ? `<h3>${t("l_orders")}</h3>${d.orders.map(o => `
+        <div class="decision"><b>${t("l_analysis")}</b><br>${esc(dc.analysis)}</div>
+        ${dc.reasoning ? `<details open><summary>${t("l_reasoning")}</summary>
+          <div class="decision">${esc(dc.reasoning)}</div></details>` : ""}
+        ${dc.memo ? `<div class="decision"><b>${t("l_memo")}</b><br>${esc(dc.memo)}</div>` : ""}
+        ${orders.length ? `<h3>${t("l_orders")}</h3>${orders.map(o => `
           <div>· <b class="${o.action}">${o.action.toUpperCase()}</b> ${esc(o.ticker)}
           ${o.eur ? fmt(o.eur) + " €" : ""}${o.qty ? esc(String(o.qty)) + t("shares") : ""}
           <div class="reason">${esc(o.reason)}</div></div>`).join("")}`
           : `<div class="muted">${t("hold")}</div>`}
-        ${(d.watchlist_changes?.add || []).map(w =>
+        ${adds.map(w =>
           `<div>${t("rec")}<b>${esc(w.ticker)}</b> <span class="reason">${esc(w.reason)}</span></div>`).join("")}
-      </div>`).join("") || `<div class="card muted">${t("no_dec")}</div>`}
+      </div>`; }).join("") || `<div class="card muted">${t("no_dec")}</div>`}
 
     <h2>${t("trades_title")}</h2>
     <div class="card">

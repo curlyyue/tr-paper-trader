@@ -25,12 +25,14 @@ CREATE TABLE IF NOT EXISTS trades (
     rationale   TEXT
 );
 CREATE TABLE IF NOT EXISTS decisions (
-    id         INTEGER PRIMARY KEY,
-    date       TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    model      TEXT,
-    raw_json   TEXT NOT NULL,
-    prompt     TEXT               -- full input the model saw (audit trail)
+    id           INTEGER PRIMARY KEY,
+    date         TEXT NOT NULL,
+    created_at   TEXT NOT NULL,
+    model        TEXT,
+    raw_json     TEXT NOT NULL,
+    prompt       TEXT,            -- full input the model saw (audit trail)
+    lang         TEXT,            -- language raw_json is written in ('en'/'zh')
+    translations TEXT             -- JSON {lang: decision-shaped dict} for the dashboard
 );
 CREATE TABLE IF NOT EXISTS snapshots (
     date            TEXT PRIMARY KEY,
@@ -61,11 +63,12 @@ class Repository:
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
-        # Migration for DBs created before the audit-trail column existed
+        # Migrations for columns added to `decisions` over time
         cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(decisions)")}
-        if "prompt" not in cols:
-            self.conn.execute("ALTER TABLE decisions ADD COLUMN prompt TEXT")
-            self.conn.commit()
+        for col in ("prompt", "lang", "translations"):
+            if col not in cols:
+                self.conn.execute(f"ALTER TABLE decisions ADD COLUMN {col} TEXT")
+        self.conn.commit()
 
     # --- cash ---
 
@@ -171,11 +174,19 @@ class Repository:
 
     # --- decisions / snapshots ---
 
-    def record_decision(self, day, created_at, model, raw_json, prompt=None):
+    def record_decision(self, day, created_at, model, raw_json, prompt=None, lang="en"):
+        cur = self.conn.execute(
+            "INSERT INTO decisions (date, created_at, model, raw_json, prompt, lang) "
+            "VALUES (?,?,?,?,?,?)",
+            (day, created_at, model, raw_json, prompt, lang),
+        )
+        self.conn.commit()
+        return cur.lastrowid
+
+    def save_translation(self, decision_id: int, translations_json: str):
         self.conn.execute(
-            "INSERT INTO decisions (date, created_at, model, raw_json, prompt) "
-            "VALUES (?,?,?,?,?)",
-            (day, created_at, model, raw_json, prompt),
+            "UPDATE decisions SET translations = ? WHERE id = ?",
+            (translations_json, decision_id),
         )
         self.conn.commit()
 

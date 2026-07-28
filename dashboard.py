@@ -34,18 +34,31 @@ def collect_agent(db_file: Path, market: YFinanceMarket) -> dict:
             "pnl_pct": round((price / pos.avg_cost - 1) * 100, 2) if price else None,
         })
 
+    def variant(src: dict) -> dict:
+        return {
+            "analysis": src.get("analysis", ""), "reasoning": src.get("reasoning", ""),
+            "memo": src.get("memo", ""), "orders": src.get("orders", []),
+            "watchlist_changes": src.get("watchlist_changes", {}),
+        }
+
     decisions = []
     for d in repo.conn.execute("SELECT * FROM decisions ORDER BY id DESC LIMIT 30"):
         try:
-            body = json.loads(d["raw_json"])
+            base = json.loads(d["raw_json"])
         except (json.JSONDecodeError, TypeError):
-            body = {}
+            base = {}
+        native = d["lang"] or "en"
+        try:
+            trans = json.loads(d["translations"]) if d["translations"] else {}
+        except (json.JSONDecodeError, TypeError):
+            trans = {}
+        # For each UI language, use the native text or its translation,
+        # falling back to native if a translation is missing.
+        langs = {L: variant(base if L == native else (trans.get(L) or base))
+                 for L in ("en", "zh")}
         decisions.append({
             "date": d["date"], "created_at": d["created_at"], "model": d["model"],
-            "analysis": body.get("analysis", ""), "reasoning": body.get("reasoning", ""),
-            "memo": body.get("memo", ""),
-            "orders": body.get("orders", []),
-            "watchlist_changes": body.get("watchlist_changes", {}),
+            "en": langs["en"], "zh": langs["zh"],
         })
 
     cash = repo.cash_balance()
