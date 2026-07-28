@@ -45,8 +45,8 @@ Mechanics:
   no longer earn their place.
 - Think about position sizing, diversification, momentum and the news provided.
   Learn from your own past trades and their outcomes shown in the context.
-- Write ALL human-readable text ("analysis", "reasoning", every "reason") in
-  简体中文 (Simplified Chinese). Keep tickers in their original form.
+- Write all human-readable text ("analysis", "reasoning", "memo", every
+  "reason") in clear English.
 Respond with ONLY a JSON object, no markdown fences, in this exact schema:
 {
   "analysis": "<2-5 sentences: market read and portfolio review>",

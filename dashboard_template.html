@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -14,16 +14,13 @@
   body { margin: 0; background: var(--bg); color: var(--text);
          font: 14px/1.55 -apple-system, "Segoe UI", Roboto, sans-serif; }
   .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
   h1 { font-size: 22px; margin: 0 0 4px; }
   h2 { font-size: 16px; margin: 28px 0 10px; color: var(--accent); }
   h3 { font-size: 14px; margin: 18px 0 8px; }
   .muted { color: var(--muted); font-size: 12px; }
   .card { background: var(--card); border: 1px solid var(--border);
           border-radius: 10px; padding: 16px; margin-top: 12px; }
-  .stats { display: flex; flex-wrap: wrap; gap: 10px; }
-  .stat { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-          padding: 10px 16px; min-width: 130px; }
-  .stat .v { font-size: 18px; font-weight: 600; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
   th { color: var(--muted); font-weight: 500; }
@@ -41,16 +38,28 @@
   .tab { padding: 6px 16px; border-radius: 8px; border: 1px solid var(--border);
          background: var(--card); color: var(--text); cursor: pointer; font-size: 14px; }
   .tab.active { background: var(--accent); color: #0f1117; border-color: var(--accent); }
+  .langswitch { display: flex; gap: 4px; }
+  .langbtn { padding: 4px 12px; border-radius: 7px; border: 1px solid var(--border);
+             background: var(--card); color: var(--muted); cursor: pointer; font-size: 13px; }
+  .langbtn.active { background: var(--accent); color: #0f1117; border-color: var(--accent); }
   canvas { max-height: 320px; }
   .newsitem { padding: 3px 0; border-bottom: 1px dashed var(--border); font-size: 12.5px; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>TR Paper Trader</h1>
-  <div class="muted" id="meta"></div>
+  <div class="header">
+    <div>
+      <h1>TR Paper Trader</h1>
+      <div class="muted" id="meta"></div>
+    </div>
+    <div class="langswitch">
+      <button class="langbtn" data-lang="en">EN</button>
+      <button class="langbtn" data-lang="zh">中文</button>
+    </div>
+  </div>
 
-  <h2>NAV 对比(所有 agent)</h2>
+  <h2 id="t-navtitle"></h2>
   <div class="card"><canvas id="navChart"></canvas></div>
   <div class="card" id="compareTable"></div>
 
@@ -61,15 +70,50 @@
 <script>
 const DATA = /*__DATA__*/;
 
+const I18N = {
+  en: {
+    meta_pre: "Prices & data as of ", meta_suf: " · re-run dashboard.py to refresh",
+    navtitle: "NAV comparison (all agents)",
+    c_agent: "agent", c_nav: "NAV", c_cash: "cash", c_posval: "positions",
+    c_deposited: "deposited", c_fees: "fees", c_return: "return",
+    pos_title: "Positions — ", c_stock: "stock", c_qty: "qty", c_avgcost: "avg cost",
+    c_price: "price", c_value: "value", c_pnl: "P/L", empty_pos: "(no positions)",
+    dec_title: "Daily decisions (analysis / reasoning / orders)",
+    l_analysis: "Analysis", l_reasoning: "Full reasoning", l_memo: "📝 Memo to future self",
+    l_orders: "Orders", hold: "Chose to hold — no orders", rec: "★ Recommends watching: ",
+    trades_title: "Trade log", c_time: "time", c_side: "side", c_reason: "reason",
+    empty_trades: "(no trades)", shares: " sh",
+    disc_title: "Agent-discovered stocks (recommendations)", empty_disc: "(none yet)",
+    news_title: "News the agent saw (archive)", news_market: "market",
+    empty_news: "(archived from the next run on)", added: "added ", no_dec: "(no decisions yet)",
+  },
+  zh: {
+    meta_pre: "价格与数据截至 ", meta_suf: " · 重新运行 dashboard.py 刷新",
+    navtitle: "NAV 对比(所有 agent)",
+    c_agent: "agent", c_nav: "NAV", c_cash: "现金", c_posval: "持仓市值",
+    c_deposited: "累计入金", c_fees: "手续费", c_return: "总收益",
+    pos_title: "持仓 — ", c_stock: "股票", c_qty: "数量", c_avgcost: "成本价",
+    c_price: "现价", c_value: "市值", c_pnl: "持仓涨幅", empty_pos: "(空仓)",
+    dec_title: "每日决策(分析 / 推理 / 订单)",
+    l_analysis: "分析", l_reasoning: "完整推理过程", l_memo: "📝 给未来自己的备忘",
+    l_orders: "订单", hold: "当日选择观望,无订单", rec: "★ 推荐加入观察:",
+    trades_title: "交易记录", c_time: "时间", c_side: "方向", c_reason: "理由",
+    empty_trades: "(无交易)", shares: " 股",
+    disc_title: "Agent 发现的股票(推荐)", empty_disc: "(暂无)",
+    news_title: "Agent 看到的新闻(存档)", news_market: "市场",
+    empty_news: "(下次运行起开始存档)", added: "加入于 ", no_dec: "(暂无决策记录)",
+  },
+};
+
+let LANG = localStorage.getItem("tr_lang") || "en";
+const t = k => I18N[LANG][k];
+
 const fmt = (n, d=2) => n == null ? "–" : n.toLocaleString("de-DE", {minimumFractionDigits: d, maximumFractionDigits: d});
 const cls = n => n == null ? "" : (n >= 0 ? "pos" : "neg");
 const sign = n => n == null ? "–" : (n >= 0 ? "+" : "") + fmt(n);
 const esc = s => (s || "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
-document.getElementById("meta").textContent =
-  `价格与数据截至 ${DATA.generated_at} · 重新运行 dashboard.py 刷新`;
-
-// --- comparison chart + table ---
+// --- comparison chart (built once; labels don't need re-render) ---
 const palette = ["#7aa2f7", "#e0af68", "#9ece6a", "#f7768e", "#bb9af7"];
 new Chart(document.getElementById("navChart"), {
   type: "line",
@@ -93,38 +137,48 @@ new Chart(document.getElementById("navChart"), {
   },
 });
 
-document.getElementById("compareTable").innerHTML = `
-  <table><tr><th>agent</th><th class="num">NAV</th><th class="num">现金</th>
-  <th class="num">持仓市值</th><th class="num">累计入金</th><th class="num">手续费</th><th class="num">总收益</th></tr>
-  ${DATA.agents.map(a => `<tr>
-    <td><b>${esc(a.name)}</b></td>
-    <td class="num">${fmt(a.nav)} €</td>
-    <td class="num">${fmt(a.cash)} €</td>
-    <td class="num">${fmt(a.positions_value)} €</td>
-    <td class="num">${fmt(a.deposits)} €</td>
-    <td class="num">${fmt(a.fees)} €</td>
-    <td class="num ${cls(a.return_pct)}">${sign(a.return_pct)}%</td>
-  </tr>`).join("")}</table>`;
-
-// --- per-agent tabs ---
-const tabs = document.getElementById("tabs");
+// --- tabs ---
+let activeAgent = DATA.agents.length ? DATA.agents[0] : null;
+const tabsEl = document.getElementById("tabs");
 DATA.agents.forEach((a, i) => {
   const b = document.createElement("button");
   b.className = "tab" + (i === 0 ? " active" : "");
   b.textContent = a.name;
-  b.onclick = () => { document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-                      b.classList.add("active"); render(a); };
-  tabs.appendChild(b);
+  b.onclick = () => { document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+                      b.classList.add("active"); activeAgent = a; render(); };
+  tabsEl.appendChild(b);
 });
 
-function render(a) {
+function renderCompare() {
+  document.getElementById("compareTable").innerHTML = `
+    <table><tr><th>${t("c_agent")}</th><th class="num">${t("c_nav")}</th><th class="num">${t("c_cash")}</th>
+    <th class="num">${t("c_posval")}</th><th class="num">${t("c_deposited")}</th>
+    <th class="num">${t("c_fees")}</th><th class="num">${t("c_return")}</th></tr>
+    ${DATA.agents.map(a => `<tr>
+      <td><b>${esc(a.name)}</b></td>
+      <td class="num">${fmt(a.nav)} €</td>
+      <td class="num">${fmt(a.cash)} €</td>
+      <td class="num">${fmt(a.positions_value)} €</td>
+      <td class="num">${fmt(a.deposits)} €</td>
+      <td class="num">${fmt(a.fees)} €</td>
+      <td class="num ${cls(a.return_pct)}">${sign(a.return_pct)}%</td>
+    </tr>`).join("")}</table>`;
+}
+
+function render() {
+  document.getElementById("meta").textContent = t("meta_pre") + DATA.generated_at + t("meta_suf");
+  document.getElementById("t-navtitle").textContent = t("navtitle");
+  renderCompare();
+
   const el = document.getElementById("agentView");
+  const a = activeAgent;
+  if (!a) { el.innerHTML = ""; return; }
   el.innerHTML = `
-    <h2>持仓 — ${esc(a.name)}</h2>
+    <h2>${t("pos_title")}${esc(a.name)}</h2>
     <div class="card">
       ${a.positions.length ? `<table>
-        <tr><th>股票</th><th class="num">数量</th><th class="num">成本价</th>
-        <th class="num">现价</th><th class="num">市值</th><th class="num">持仓涨幅</th></tr>
+        <tr><th>${t("c_stock")}</th><th class="num">${t("c_qty")}</th><th class="num">${t("c_avgcost")}</th>
+        <th class="num">${t("c_price")}</th><th class="num">${t("c_value")}</th><th class="num">${t("c_pnl")}</th></tr>
         ${a.positions.map(p => `<tr>
           <td><b>${esc(p.ticker)}</b></td>
           <td class="num">${fmt(p.qty, 4)}</td>
@@ -132,58 +186,70 @@ function render(a) {
           <td class="num">${fmt(p.price)} €</td>
           <td class="num">${fmt(p.value)} €</td>
           <td class="num ${cls(p.pnl_pct)}"><b>${sign(p.pnl_pct)}%</b></td>
-        </tr>`).join("")}</table>` : `<span class="muted">(空仓)</span>`}
+        </tr>`).join("")}</table>` : `<span class="muted">${t("empty_pos")}</span>`}
     </div>
 
-    <h2>每日决策(analysis / reasoning / 订单)</h2>
+    <h2>${t("dec_title")}</h2>
     ${a.decisions.map(d => `
       <div class="card">
         <span class="pill">${esc(d.created_at || d.date)}</span>
         <span class="pill">${esc(d.model || "")}</span>
-        <div class="decision"><b>分析</b><br>${esc(d.analysis)}</div>
-        ${d.reasoning ? `<details open><summary>完整推理过程</summary>
+        <div class="decision"><b>${t("l_analysis")}</b><br>${esc(d.analysis)}</div>
+        ${d.reasoning ? `<details open><summary>${t("l_reasoning")}</summary>
           <div class="decision">${esc(d.reasoning)}</div></details>` : ""}
-        ${d.memo ? `<div class="decision"><b>📝 给未来自己的备忘</b><br>${esc(d.memo)}</div>` : ""}
-        ${d.orders.length ? `<h3>订单</h3>${d.orders.map(o => `
+        ${d.memo ? `<div class="decision"><b>${t("l_memo")}</b><br>${esc(d.memo)}</div>` : ""}
+        ${d.orders.length ? `<h3>${t("l_orders")}</h3>${d.orders.map(o => `
           <div>· <b class="${o.action}">${o.action.toUpperCase()}</b> ${esc(o.ticker)}
-          ${o.eur ? fmt(o.eur) + " €" : ""}${o.qty ? esc(String(o.qty)) + " 股" : ""}
+          ${o.eur ? fmt(o.eur) + " €" : ""}${o.qty ? esc(String(o.qty)) + t("shares") : ""}
           <div class="reason">${esc(o.reason)}</div></div>`).join("")}`
-          : `<div class="muted">当日选择观望,无订单</div>`}
+          : `<div class="muted">${t("hold")}</div>`}
         ${(d.watchlist_changes?.add || []).map(w =>
-          `<div>★ 推荐加入观察:<b>${esc(w.ticker)}</b> <span class="reason">${esc(w.reason)}</span></div>`).join("")}
-      </div>`).join("") || `<div class="card muted">(暂无决策记录)</div>`}
+          `<div>${t("rec")}<b>${esc(w.ticker)}</b> <span class="reason">${esc(w.reason)}</span></div>`).join("")}
+      </div>`).join("") || `<div class="card muted">${t("no_dec")}</div>`}
 
-    <h2>交易记录</h2>
+    <h2>${t("trades_title")}</h2>
     <div class="card">
       ${a.trades.length ? `<table>
-        <tr><th>时间</th><th>方向</th><th>股票</th><th class="num">数量</th>
-        <th class="num">价格</th><th>理由</th></tr>
-        ${a.trades.map(t => `<tr>
-          <td class="muted">${esc(t.executed_at).replace("T", " ")}</td>
-          <td class="${t.side}"><b>${t.side.toUpperCase()}</b></td>
-          <td>${esc(t.ticker)}</td>
-          <td class="num">${fmt(t.qty, 4)}</td>
-          <td class="num">${fmt(t.price)} €</td>
-          <td class="reason">${esc(t.reason)}</td>
-        </tr>`).join("")}</table>` : `<span class="muted">(无交易)</span>`}
+        <tr><th>${t("c_time")}</th><th>${t("c_side")}</th><th>${t("c_stock")}</th><th class="num">${t("c_qty")}</th>
+        <th class="num">${t("c_price")}</th><th>${t("c_reason")}</th></tr>
+        ${a.trades.map(tr => `<tr>
+          <td class="muted">${esc(tr.executed_at).replace("T", " ")}</td>
+          <td class="${tr.side}"><b>${tr.side.toUpperCase()}</b></td>
+          <td>${esc(tr.ticker)}</td>
+          <td class="num">${fmt(tr.qty, 4)}</td>
+          <td class="num">${fmt(tr.price)} €</td>
+          <td class="reason">${esc(tr.reason)}</td>
+        </tr>`).join("")}</table>` : `<span class="muted">${t("empty_trades")}</span>`}
     </div>
 
-    <h2>Agent 发现的股票(推荐)</h2>
+    <h2>${t("disc_title")}</h2>
     <div class="card">
       ${a.watchlist.length ? a.watchlist.map(w =>
-        `<div>★ <b>${esc(w.ticker)}</b> <span class="pill">${esc(w.added_at.slice(0,10))}</span>
+        `<div>★ <b>${esc(w.ticker)}</b> <span class="pill">${t("added")}${esc(w.added_at.slice(0,10))}</span>
          <div class="reason">${esc(w.reason)}</div></div>`).join("")
-       : `<span class="muted">(暂无)</span>`}
+       : `<span class="muted">${t("empty_disc")}</span>`}
     </div>
 
-    <h2>Agent 看到的新闻(存档)</h2>
+    <h2>${t("news_title")}</h2>
     <div class="card">
       ${a.news.length ? a.news.map(n =>
-        `<div class="newsitem"><span class="pill">${esc(n.ticker) || "市场"}</span> ${esc(n.headline)}</div>`).join("")
-       : `<span class="muted">(下次运行起开始存档)</span>`}
+        `<div class="newsitem"><span class="pill">${esc(n.ticker) || t("news_market")}</span> ${esc(n.headline)}</div>`).join("")
+       : `<span class="muted">${t("empty_news")}</span>`}
     </div>`;
 }
-if (DATA.agents.length) render(DATA.agents[0]);
+
+// --- language switch ---
+function setLang(lang) {
+  LANG = lang;
+  localStorage.setItem("tr_lang", lang);
+  document.querySelectorAll(".langbtn").forEach(b =>
+    b.classList.toggle("active", b.dataset.lang === lang));
+  document.documentElement.lang = lang === "zh" ? "zh" : "en";
+  render();
+}
+document.querySelectorAll(".langbtn").forEach(b => b.onclick = () => setLang(b.dataset.lang));
+
+setLang(LANG);
 </script>
 </body>
 </html>
