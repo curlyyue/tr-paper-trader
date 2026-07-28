@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TR Paper Trader</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+  :root {
+    --bg: #0f1117; --card: #181b23; --border: #262a35; --text: #e6e8ee;
+    --muted: #8b91a0; --green: #34d399; --red: #f87171; --accent: #7aa2f7;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.55 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 28px 0 10px; color: var(--accent); }
+  h3 { font-size: 14px; margin: 18px 0 8px; }
+  .muted { color: var(--muted); font-size: 12px; }
+  .card { background: var(--card); border: 1px solid var(--border);
+          border-radius: 10px; padding: 16px; margin-top: 12px; }
+  .stats { display: flex; flex-wrap: wrap; gap: 10px; }
+  .stat { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+          padding: 10px 16px; min-width: 130px; }
+  .stat .v { font-size: 18px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pos { color: var(--green); } .neg { color: var(--red); }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 11px;
+          border: 1px solid var(--border); color: var(--muted); }
+  .buy { color: var(--green); } .sell { color: var(--red); }
+  details { margin-top: 8px; }
+  summary { cursor: pointer; color: var(--muted); }
+  .decision { border-left: 3px solid var(--accent); padding: 8px 12px; margin: 10px 0;
+              background: rgba(122,162,247,.05); border-radius: 0 8px 8px 0; }
+  .reason { color: var(--muted); font-size: 12px; }
+  .tabs { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+  .tab { padding: 6px 16px; border-radius: 8px; border: 1px solid var(--border);
+         background: var(--card); color: var(--text); cursor: pointer; font-size: 14px; }
+  .tab.active { background: var(--accent); color: #0f1117; border-color: var(--accent); }
+  canvas { max-height: 320px; }
+  .newsitem { padding: 3px 0; border-bottom: 1px dashed var(--border); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>TR Paper Trader</h1>
+  <div class="muted" id="meta"></div>
+
+  <h2>NAV 对比(所有 agent)</h2>
+  <div class="card"><canvas id="navChart"></canvas></div>
+  <div class="card" id="compareTable"></div>
+
+  <div class="tabs" id="tabs"></div>
+  <div id="agentView"></div>
+</div>
+
+<script>
+const DATA = /*__DATA__*/;
+
+const fmt = (n, d=2) => n == null ? "–" : n.toLocaleString("de-DE", {minimumFractionDigits: d, maximumFractionDigits: d});
+const cls = n => n == null ? "" : (n >= 0 ? "pos" : "neg");
+const sign = n => n == null ? "–" : (n >= 0 ? "+" : "") + fmt(n);
+const esc = s => (s || "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+document.getElementById("meta").textContent =
+  `价格与数据截至 ${DATA.generated_at} · 重新运行 dashboard.py 刷新`;
+
+// --- comparison chart + table ---
+const palette = ["#7aa2f7", "#e0af68", "#9ece6a", "#f7768e", "#bb9af7"];
+new Chart(document.getElementById("navChart"), {
+  type: "line",
+  data: {
+    labels: [...new Set(DATA.agents.flatMap(a => a.nav_history.map(h => h.date)))].sort(),
+    datasets: DATA.agents.map((a, i) => ({
+      label: a.name,
+      data: a.nav_history.map(h => ({x: h.date, y: h.nav})),
+      borderColor: palette[i % palette.length],
+      backgroundColor: palette[i % palette.length],
+      tension: .25, pointRadius: 3,
+    })),
+  },
+  options: {
+    parsing: {xAxisKey: "x", yAxisKey: "y"},
+    scales: {
+      x: {type: "category", grid: {color: "#262a35"}, ticks: {color: "#8b91a0"}},
+      y: {grid: {color: "#262a35"}, ticks: {color: "#8b91a0", callback: v => fmt(v,0) + " €"}},
+    },
+    plugins: {legend: {labels: {color: "#e6e8ee"}}},
+  },
+});
+
+document.getElementById("compareTable").innerHTML = `
+  <table><tr><th>agent</th><th class="num">NAV</th><th class="num">现金</th>
+  <th class="num">持仓市值</th><th class="num">累计入金</th><th class="num">手续费</th><th class="num">总收益</th></tr>
+  ${DATA.agents.map(a => `<tr>
+    <td><b>${esc(a.name)}</b></td>
+    <td class="num">${fmt(a.nav)} €</td>
+    <td class="num">${fmt(a.cash)} €</td>
+    <td class="num">${fmt(a.positions_value)} €</td>
+    <td class="num">${fmt(a.deposits)} €</td>
+    <td class="num">${fmt(a.fees)} €</td>
+    <td class="num ${cls(a.return_pct)}">${sign(a.return_pct)}%</td>
+  </tr>`).join("")}</table>`;
+
+// --- per-agent tabs ---
+const tabs = document.getElementById("tabs");
+DATA.agents.forEach((a, i) => {
+  const b = document.createElement("button");
+  b.className = "tab" + (i === 0 ? " active" : "");
+  b.textContent = a.name;
+  b.onclick = () => { document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+                      b.classList.add("active"); render(a); };
+  tabs.appendChild(b);
+});
+
+function render(a) {
+  const el = document.getElementById("agentView");
+  el.innerHTML = `
+    <h2>持仓 — ${esc(a.name)}</h2>
+    <div class="card">
+      ${a.positions.length ? `<table>
+        <tr><th>股票</th><th class="num">数量</th><th class="num">成本价</th>
+        <th class="num">现价</th><th class="num">市值</th><th class="num">持仓涨幅</th></tr>
+        ${a.positions.map(p => `<tr>
+          <td><b>${esc(p.ticker)}</b></td>
+          <td class="num">${fmt(p.qty, 4)}</td>
+          <td class="num">${fmt(p.avg_cost)} €</td>
+          <td class="num">${fmt(p.price)} €</td>
+          <td class="num">${fmt(p.value)} €</td>
+          <td class="num ${cls(p.pnl_pct)}"><b>${sign(p.pnl_pct)}%</b></td>
+        </tr>`).join("")}</table>` : `<span class="muted">(空仓)</span>`}
+    </div>
+
+    <h2>每日决策(analysis / reasoning / 订单)</h2>
+    ${a.decisions.map(d => `
+      <div class="card">
+        <span class="pill">${esc(d.created_at || d.date)}</span>
+        <span class="pill">${esc(d.model || "")}</span>
+        <div class="decision"><b>分析</b><br>${esc(d.analysis)}</div>
+        ${d.reasoning ? `<details open><summary>完整推理过程</summary>
+          <div class="decision">${esc(d.reasoning)}</div></details>` : ""}
+        ${d.memo ? `<div class="decision"><b>📝 给未来自己的备忘</b><br>${esc(d.memo)}</div>` : ""}
+        ${d.orders.length ? `<h3>订单</h3>${d.orders.map(o => `
+          <div>· <b class="${o.action}">${o.action.toUpperCase()}</b> ${esc(o.ticker)}
+          ${o.eur ? fmt(o.eur) + " €" : ""}${o.qty ? esc(String(o.qty)) + " 股" : ""}
+          <div class="reason">${esc(o.reason)}</div></div>`).join("")}`
+          : `<div class="muted">当日选择观望,无订单</div>`}
+        ${(d.watchlist_changes?.add || []).map(w =>
+          `<div>★ 推荐加入观察:<b>${esc(w.ticker)}</b> <span class="reason">${esc(w.reason)}</span></div>`).join("")}
+      </div>`).join("") || `<div class="card muted">(暂无决策记录)</div>`}
+
+    <h2>交易记录</h2>
+    <div class="card">
+      ${a.trades.length ? `<table>
+        <tr><th>时间</th><th>方向</th><th>股票</th><th class="num">数量</th>
+        <th class="num">价格</th><th>理由</th></tr>
+        ${a.trades.map(t => `<tr>
+          <td class="muted">${esc(t.executed_at).replace("T", " ")}</td>
+          <td class="${t.side}"><b>${t.side.toUpperCase()}</b></td>
+          <td>${esc(t.ticker)}</td>
+          <td class="num">${fmt(t.qty, 4)}</td>
+          <td class="num">${fmt(t.price)} €</td>
+          <td class="reason">${esc(t.reason)}</td>
+        </tr>`).join("")}</table>` : `<span class="muted">(无交易)</span>`}
+    </div>
+
+    <h2>Agent 发现的股票(推荐)</h2>
+    <div class="card">
+      ${a.watchlist.length ? a.watchlist.map(w =>
+        `<div>★ <b>${esc(w.ticker)}</b> <span class="pill">${esc(w.added_at.slice(0,10))}</span>
+         <div class="reason">${esc(w.reason)}</div></div>`).join("")
+       : `<span class="muted">(暂无)</span>`}
+    </div>
+
+    <h2>Agent 看到的新闻(存档)</h2>
+    <div class="card">
+      ${a.news.length ? a.news.map(n =>
+        `<div class="newsitem"><span class="pill">${esc(n.ticker) || "市场"}</span> ${esc(n.headline)}</div>`).join("")
+       : `<span class="muted">(下次运行起开始存档)</span>`}
+    </div>`;
+}
+if (DATA.agents.length) render(DATA.agents[0]);
+</script>
+</body>
+</html>

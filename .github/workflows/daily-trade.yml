@@ -1,0 +1,107 @@
+name: Paper trade
+
+on:
+  schedule:
+    # Full daily decision: 08:00 UTC weekdays = 09:00 (winter) / 10:00 (summer)
+    # Berlin — always inside XETRA hours. GitHub cron is UTC, no DST.
+    - cron: "0 8 * * 1-5"
+    # Intraday monitor: hourly at :30, 08:30–19:30 UTC weekdays. Cheap price
+    # checks; the LLM is woken only on a real move (and capped per day).
+    - cron: "30 8-19 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "which task to run"
+        type: choice
+        options: [daily, monitor]
+        default: daily
+
+concurrency:
+  group: paper-trade          # serialize daily + monitor runs; never overlap
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  trade:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          npm install -g @anthropic-ai/claude-code
+
+      - name: Decide task (daily decision vs intraday monitor)
+        id: task
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            MODE="${{ github.event.inputs.mode }}"
+          elif [ "${{ github.event.schedule }}" = "30 8-19 * * 1-5" ]; then
+            MODE="monitor"
+          else
+            MODE="daily"
+          fi
+          if [ "$MODE" = "monitor" ]; then
+            # cron owns the timing in CI, so --force skips monitor's own
+            # local-time market-hours gate; price-move thresholds still gate
+            # whether the LLM is actually woken.
+            echo "cmd=monitor.py"   >> "$GITHUB_OUTPUT"
+            echo "args=--force"     >> "$GITHUB_OUTPUT"
+          else
+            echo "cmd=run_daily.py" >> "$GITHUB_OUTPUT"
+            echo "args="            >> "$GITHUB_OUTPUT"
+          fi
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "Running mode: $MODE"
+
+      - name: Run agents (opus + haiku)
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          python ${{ steps.task.outputs.cmd }} --model opus  ${{ steps.task.outputs.args }} || echo "opus run failed"
+          python ${{ steps.task.outputs.cmd }} --model haiku ${{ steps.task.outputs.args }} || echo "haiku run failed"
+
+      - name: Build dashboard
+        run: python dashboard.py
+
+      - name: Commit updated ledgers
+        run: |
+          git config user.name  "paper-trader-bot"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/*.db
+          git commit -m "${{ steps.task.outputs.mode }} run $(date -u +%Y-%m-%dT%H:%MZ)" || echo "nothing to commit"
+          git push
+
+      - name: Upload dashboard artifact (always downloadable)
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard
+          path: dashboard/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dashboard/
+
+  deploy:
+    needs: trade
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

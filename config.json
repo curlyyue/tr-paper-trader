@@ -1,0 +1,41 @@
+{
+  "daily_budget_eur": 300,
+  "fee_per_trade_eur": 1.0,
+  "model": "opus",
+  "monitor": {
+    "held_move_pct": 5.0,
+    "watch_move_pct": 8.0,
+    "max_llm_runs_per_day": 3,
+    "market_hours": [9, 22]
+  },
+  "watchlist": [
+    "SAP.DE",
+    "SIE.DE",
+    "ALV.DE",
+    "AIR.DE",
+    "DTE.DE",
+    "RHM.DE",
+    "IFX.DE",
+    "AAPL",
+    "MSFT",
+    "NVDA",
+    "ASML",
+    "NOVO-B.CO",
+    "MC.PA",
+    "EUNL.DE",
+    "SXR8.DE",
+    "SXRV.DE",
+    "TSM",
+    "000660.KS"
+  ],
+  "market_holidays": [
+    "2026-01-01",
+    "2026-04-03",
+    "2026-04-06",
+    "2026-05-01",
+    "2026-05-25",
+    "2026-12-24",
+    "2026-12-25",
+    "2026-12-31"
+  ]
+}

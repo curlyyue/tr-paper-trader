@@ -1,0 +1,101 @@
+"""Generate a static dashboard (dashboard/index.html) from all agent databases.
+
+  python dashboard.py            # regenerate with live prices
+  open dashboard/index.html
+
+The output is a self-contained page (Chart.js from CDN) — the same file can
+later be deployed as-is to GitHub/Cloudflare Pages.
+"""
+import json
+from datetime import datetime
+from pathlib import Path
+
+from trader.config import DATA_DIR, ROOT
+from trader.market import YFinanceMarket
+from trader.storage import Repository
+
+OUT_DIR = ROOT / "dashboard"
+
+
+def collect_agent(db_file: Path, market: YFinanceMarket) -> dict:
+    repo = Repository(db_file)
+    positions = repo.positions()
+    quotes = market.quotes(list(positions)) if positions else {}
+
+    pos_rows, positions_value = [], 0.0
+    for tk, pos in positions.items():
+        q = quotes.get(tk)
+        price = q.price_eur if q else None
+        value = pos.qty * price if price else pos.cost
+        positions_value += value
+        pos_rows.append({
+            "ticker": tk, "qty": round(pos.qty, 4), "avg_cost": round(pos.avg_cost, 2),
+            "price": round(price, 2) if price else None, "value": round(value, 2),
+            "pnl_pct": round((price / pos.avg_cost - 1) * 100, 2) if price else None,
+        })
+
+    decisions = []
+    for d in repo.conn.execute("SELECT * FROM decisions ORDER BY id DESC LIMIT 30"):
+        try:
+            body = json.loads(d["raw_json"])
+        except (json.JSONDecodeError, TypeError):
+            body = {}
+        decisions.append({
+            "date": d["date"], "created_at": d["created_at"], "model": d["model"],
+            "analysis": body.get("analysis", ""), "reasoning": body.get("reasoning", ""),
+            "memo": body.get("memo", ""),
+            "orders": body.get("orders", []),
+            "watchlist_changes": body.get("watchlist_changes", {}),
+        })
+
+    cash = repo.cash_balance()
+    deposits = repo.deposits_total()
+    nav = cash + positions_value
+    agent = {
+        "name": db_file.stem,
+        "cash": round(cash, 2), "deposits": round(deposits, 2),
+        "fees": round(repo.fees_total(), 2),
+        "positions_value": round(positions_value, 2), "nav": round(nav, 2),
+        "return_pct": round((nav / deposits - 1) * 100, 2) if deposits else None,
+        "positions": pos_rows,
+        "nav_history": [
+            {"date": s["date"], "nav": round(s["nav"], 2), "cash": round(s["cash"], 2)}
+            for s in reversed(repo.nav_history(365))
+        ],
+        "trades": [
+            {"executed_at": t["executed_at"], "side": t["side"], "ticker": t["ticker"],
+             "qty": round(t["qty"], 4), "price": round(t["price"], 2),
+             "fee": t["fee"], "reason": t["rationale"] or ""}
+            for t in repo.recent_trades(100)
+        ],
+        "decisions": decisions,
+        "watchlist": [
+            {"ticker": w["ticker"], "added_at": w["added_at"], "reason": w["reason"] or ""}
+            for w in repo.dynamic_watchlist()
+        ],
+        "news": [
+            {"date": n["date"], "ticker": n["ticker"], "headline": n["headline"]}
+            for n in repo.recent_news(150)
+        ],
+    }
+    repo.close()
+    return agent
+
+
+def main():
+    market = YFinanceMarket()
+    agents = [collect_agent(f, market) for f in sorted(DATA_DIR.glob("*.db"))]
+    data = {
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "agents": agents,
+    }
+    OUT_DIR.mkdir(exist_ok=True)
+    template = (ROOT / "dashboard_template.html").read_text()
+    html = template.replace("/*__DATA__*/", json.dumps(data, ensure_ascii=False))
+    (OUT_DIR / "index.html").write_text(html)
+    print(f"Dashboard written to {OUT_DIR / 'index.html'} "
+          f"({len(agents)} agent(s), prices as of {data['generated_at']})")
+
+
+if __name__ == "__main__":
+    main()
