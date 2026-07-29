@@ -7,8 +7,14 @@ are free; the LLM is only consulted when something actually moved:
 A per-day LLM run cap (`max_llm_runs_per_day`, counting the regular daily run)
 protects your subscription quota.
 
+The monitor also acts as the safety net for the daily decision: GitHub's cron is
+best-effort and regularly drops or delays scheduled events, so if today's daily
+decision is still missing when the monitor wakes up on a trading day, it runs
+that instead of the price check. `Repository.has_decision` keeps this idempotent.
+
   python monitor.py --model opus
   python monitor.py --model opus --check-only   # show triggers, never call LLM
+  python monitor.py --model opus --no-catch-up  # never run the daily decision
 """
 import argparse
 import json
@@ -43,6 +49,8 @@ def main():
     ap.add_argument("--backend", choices=["cli", "api"])
     ap.add_argument("--check-only", action="store_true", help="report triggers, never call the LLM")
     ap.add_argument("--force", action="store_true", help="ignore trading-day/market-hours checks")
+    ap.add_argument("--no-catch-up", action="store_true",
+                    help="never run a missing daily decision, only price checks")
     args = ap.parse_args()
 
     settings = load_settings(model=args.model, agent=args.agent, backend=args.backend)
@@ -58,6 +66,16 @@ def main():
         if not (h0 <= now.hour < h1):
             print(f"{now:%H:%M}: outside market hours ({h0}:00–{h1}:00), monitor idle.")
             return
+
+    # Catch up a daily decision GitHub's cron never delivered. Gated on the real
+    # trading-day check (not `--force`, which CI always passes) so a weekend
+    # monitor run never opens a book, and skipped under --check-only.
+    catch_up = not args.no_catch_up and not args.check_only
+    if catch_up and pipeline.is_trading_day(day) and not pipeline.repo.has_decision(day, "daily"):
+        print(f"{now:%H:%M}: today's daily decision is missing (dropped cron?) — "
+              f"running it now instead of the price check.")
+        pipeline.run(kind="daily")
+        return
 
     held = set(pipeline.repo.positions())
     dynamic = {row["ticker"] for row in pipeline.repo.dynamic_watchlist()}
@@ -87,7 +105,7 @@ def main():
         print(f"LLM run cap reached for today ({runs}/{cap}) — skipping to protect quota.")
         return
 
-    pipeline.run(trigger="; ".join(triggers))
+    pipeline.run(trigger="; ".join(triggers), kind="monitor")
 
 
 if __name__ == "__main__":

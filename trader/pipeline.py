@@ -26,20 +26,30 @@ class DailyPipeline:
         return d.weekday() < 5 and day not in self.settings.holidays
 
     def run(self, dry_run: bool = False, force: bool = False,
-            trigger: str | None = None) -> None:
+            trigger: str | None = None, kind: str = "daily") -> None:
         now = datetime.now()
         day = now.date().isoformat()
         now_iso = now.isoformat(timespec="seconds")
         now_human = now.strftime("%Y-%m-%d %H:%M (%A)")
 
         print(f"Agent: {self.settings.agent_name}  |  engine: {self.engine.name}")
-        print(f"Decision time: {now_human}")
+        print(f"Decision time: {now_human}  |  kind: {kind}")
         if trigger:
             print(f"Triggered by: {trigger}")
 
         if not self.is_trading_day(day) and not force:
             print(f"{day} is not a trading day (weekend/holiday). Use --force to override.")
             return
+
+        # The daily decision happens at most once per day. GitHub's cron is
+        # best-effort, so the hourly monitor also tries to catch up a dropped
+        # 08:17 slot — this guard is what makes that retry safe.
+        if kind == "daily" and not dry_run and self.repo.has_decision(day, "daily"):
+            if not force:
+                print(f"Daily decision for {day} already recorded — nothing to do. "
+                      f"Use --force to run a second one.")
+                return
+            print(f"[warn] daily decision for {day} already exists; --force given, running again.")
 
         # 1. Daily budget (idempotent per day)
         if not dry_run:
@@ -80,7 +90,8 @@ class DailyPipeline:
         print("Asking Claude for a decision ...")
         decision = self.engine.decide(prompt)
         dec_id = self.repo.record_decision(
-            day, now_iso, decision.model_used, decision.raw_json, prompt, lang="en"
+            day, now_iso, decision.model_used, decision.raw_json, prompt,
+            lang="en", kind=kind,
         )
         print(f"\nAnalysis: {decision.analysis}\n")
 

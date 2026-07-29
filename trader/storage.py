@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS decisions (
     raw_json     TEXT NOT NULL,
     prompt       TEXT,            -- full input the model saw (audit trail)
     lang         TEXT,            -- language raw_json is written in ('en'/'zh')
-    translations TEXT             -- JSON {lang: decision-shaped dict} for the dashboard
+    translations TEXT,            -- JSON {lang: decision-shaped dict} for the dashboard
+    kind         TEXT             -- 'daily' (the once-a-day decision) or 'monitor'
 );
 CREATE TABLE IF NOT EXISTS snapshots (
     date            TEXT PRIMARY KEY,
@@ -65,7 +66,7 @@ class Repository:
         self.conn.executescript(SCHEMA)
         # Migrations for columns added to `decisions` over time
         cols = {r["name"] for r in self.conn.execute("PRAGMA table_info(decisions)")}
-        for col in ("prompt", "lang", "translations"):
+        for col in ("prompt", "lang", "translations", "kind"):
             if col not in cols:
                 self.conn.execute(f"ALTER TABLE decisions ADD COLUMN {col} TEXT")
         self.conn.commit()
@@ -174,11 +175,12 @@ class Repository:
 
     # --- decisions / snapshots ---
 
-    def record_decision(self, day, created_at, model, raw_json, prompt=None, lang="en"):
+    def record_decision(self, day, created_at, model, raw_json, prompt=None,
+                        lang="en", kind="daily"):
         cur = self.conn.execute(
-            "INSERT INTO decisions (date, created_at, model, raw_json, prompt, lang) "
-            "VALUES (?,?,?,?,?,?)",
-            (day, created_at, model, raw_json, prompt, lang),
+            "INSERT INTO decisions (date, created_at, model, raw_json, prompt, lang, kind) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (day, created_at, model, raw_json, prompt, lang, kind),
         )
         self.conn.commit()
         return cur.lastrowid
@@ -202,6 +204,13 @@ class Repository:
         return self.conn.execute(
             "SELECT COUNT(*) AS c FROM decisions WHERE date = ?", (day,)
         ).fetchone()["c"]
+
+    def has_decision(self, day: str, kind: str) -> bool:
+        """Did a decision of this kind already land today? Guards the daily run
+        against double-execution when the monitor catches up a dropped cron."""
+        return self.conn.execute(
+            "SELECT 1 FROM decisions WHERE date = ? AND kind = ? LIMIT 1", (day, kind)
+        ).fetchone() is not None
 
     def nav_history(self, limit=30):
         return self.conn.execute(

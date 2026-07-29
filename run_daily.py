@@ -17,7 +17,8 @@ def main():
     ap.add_argument("--agent", help="ledger name, defaults to model name (overrides .env)")
     ap.add_argument("--backend", choices=["cli", "api"], help="overrides .env")
     ap.add_argument("--dry-run", action="store_true", help="no LLM call, no trades")
-    ap.add_argument("--force", action="store_true", help="run even on non-trading days")
+    ap.add_argument("--force", action="store_true",
+                    help="run even on non-trading days, or a second time in one day")
     args = ap.parse_args()
 
     settings = load_settings(model=args.model, agent=args.agent, backend=args.backend)
