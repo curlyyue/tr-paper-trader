@@ -115,6 +115,35 @@ class Repository:
                 p.qty -= t["qty"]
         return {k: v for k, v in pos.items() if v.qty > 1e-9}
 
+    def closed_positions(self) -> list[dict]:
+        """Fully-exited tickers (qty back to ~0), with realized P/L from the
+        average-cost replay — the complement of positions() over the same
+        trade history, so a ticker is in exactly one of the two sets."""
+        state: dict[str, dict] = {}
+        for t in self.conn.execute("SELECT * FROM trades ORDER BY id"):
+            s = state.setdefault(t["ticker"], {"qty": 0.0, "cost": 0.0,
+                                                "realized": 0.0, "cost_sold": 0.0,
+                                                "fees": 0.0, "closed_at": None})
+            s["fees"] += t["fee"]
+            if t["side"] == "buy":
+                s["cost"] += t["qty"] * t["price"]
+                s["qty"] += t["qty"]
+                s["closed_at"] = None  # re-buying reopens the position
+            else:
+                avg_cost = s["cost"] / s["qty"] if s["qty"] > 1e-9 else 0.0
+                cost_removed = t["qty"] * avg_cost
+                s["realized"] += t["qty"] * t["price"] - cost_removed
+                s["cost_sold"] += cost_removed
+                s["cost"] -= cost_removed
+                s["qty"] -= t["qty"]
+                s["closed_at"] = t["executed_at"]
+        return [
+            {"ticker": tk, "realized_pnl": s["realized"], "fees": s["fees"],
+             "realized_pct": (s["realized"] / s["cost_sold"] * 100) if s["cost_sold"] > 1e-9 else None,
+             "closed_at": s["closed_at"]}
+            for tk, s in state.items() if s["qty"] <= 1e-9 and s["cost_sold"] > 1e-9
+        ]
+
     def record_trade(self, day, executed_at, ticker, side, qty, price, fee, rationale):
         self.conn.execute(
             "INSERT INTO trades (date, executed_at, ticker, side, qty, price, fee, rationale) "

@@ -71,9 +71,11 @@ def collect_agent(db_file: Path, market: YFinanceMarket) -> dict:
         "positions_value": round(positions_value, 2), "nav": round(nav, 2),
         "return_pct": round((nav / deposits - 1) * 100, 2) if deposits else None,
         "positions": pos_rows,
-        "nav_history": [
-            {"date": s["date"], "nav": round(s["nav"], 2), "cash": round(s["cash"], 2)}
-            for s in reversed(repo.nav_history(365))
+        "closed_positions": [
+            {"ticker": c["ticker"], "realized_pnl": round(c["realized_pnl"], 2),
+             "realized_pct": round(c["realized_pct"], 2) if c["realized_pct"] is not None else None,
+             "fees": round(c["fees"], 2), "closed_at": c["closed_at"]}
+            for c in sorted(repo.closed_positions(), key=lambda c: c["closed_at"] or "", reverse=True)
         ],
         "trades": [
             {"executed_at": t["executed_at"], "side": t["side"], "ticker": t["ticker"],

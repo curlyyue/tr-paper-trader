@@ -12,57 +12,101 @@
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text);
-         font: 14px/1.55 -apple-system, "Segoe UI", Roboto, sans-serif; }
-  .wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 60px; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  h2 { font-size: 16px; margin: 28px 0 10px; color: var(--accent); }
-  h3 { font-size: 14px; margin: 18px 0 8px; }
-  .muted { color: var(--muted); font-size: 12px; }
+         font: 14px/1.55 -apple-system, "Segoe UI", Roboto, sans-serif;
+         font-optical-sizing: auto; letter-spacing: 0; }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px 60px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+             position: sticky; top: 0; z-index: 10;
+             margin: 0 -16px 8px; padding: 20px 16px 14px;
+             background: rgba(15,17,23,.75);
+             -webkit-backdrop-filter: blur(20px) saturate(180%);
+             backdrop-filter: blur(20px) saturate(180%);
+             border-bottom: 1px solid rgba(230,232,238,.08); }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.02em; }
+  h2 { font-size: 16px; margin: 28px 0 10px; color: var(--accent); letter-spacing: -0.01em; }
+  h3 { font-size: 14px; margin: 18px 0 8px; letter-spacing: -0.005em; }
+  .muted { color: var(--muted); font-size: 12px; letter-spacing: 0.01em; }
   .card { background: var(--card); border: 1px solid var(--border);
-          border-radius: 10px; padding: 16px; margin-top: 12px; }
+          border-radius: 10px; padding: 16px; margin-top: 12px;
+          box-shadow: 0 1px 2px rgba(0,0,0,.24), 0 8px 24px rgba(0,0,0,.12); }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
-  th { color: var(--muted); font-weight: 500; }
+  th { color: var(--muted); font-weight: 500; letter-spacing: 0.01em; }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   .pos { color: var(--green); } .neg { color: var(--red); }
   .pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 11px;
-          border: 1px solid var(--border); color: var(--muted); }
+          border: 1px solid var(--border); color: var(--muted); letter-spacing: 0.01em; }
   .buy { color: var(--green); } .sell { color: var(--red); }
   details { margin-top: 8px; }
   summary { cursor: pointer; color: var(--muted); }
   .decision { border-left: 3px solid var(--accent); padding: 8px 12px; margin: 10px 0;
               background: rgba(122,162,247,.05); border-radius: 0 8px 8px 0; }
-  .reason { color: var(--muted); font-size: 12px; }
+  .reason { color: var(--muted); font-size: 12px; letter-spacing: 0.01em; }
   .tabs { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
   .tab { padding: 6px 16px; border-radius: 8px; border: 1px solid var(--border);
-         background: var(--card); color: var(--text); cursor: pointer; font-size: 14px; }
+         background: var(--card); color: var(--text); cursor: pointer; font-size: 14px;
+         transition: transform .1s ease-out, background-color .2s ease, border-color .2s ease, color .2s ease; }
   .tab.active { background: var(--accent); color: #0f1117; border-color: var(--accent); }
+  .tab:active { transform: scale(0.96); }
+  .segmented { display: inline-flex; padding: 3px; gap: 2px; margin-top: 14px;
+               background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
+  .segbtn { border: none; background: transparent; color: var(--muted); cursor: pointer;
+            padding: 6px 14px; border-radius: 7px; font-size: 13px;
+            transition: transform .1s ease-out, background-color .2s ease, color .2s ease; }
+  .segbtn.active { background: var(--accent); color: #0f1117; }
+  .segbtn:active { transform: scale(0.96); }
   .langswitch { display: flex; gap: 4px; }
   .langbtn { padding: 4px 12px; border-radius: 7px; border: 1px solid var(--border);
-             background: var(--card); color: var(--muted); cursor: pointer; font-size: 13px; }
+             background: var(--card); color: var(--muted); cursor: pointer; font-size: 13px;
+             transition: transform .1s ease-out, background-color .2s ease, border-color .2s ease, color .2s ease; }
   .langbtn.active { background: var(--accent); color: #0f1117; border-color: var(--accent); }
-  canvas { max-height: 320px; }
+  .langbtn:active { transform: scale(0.94); }
   .newsitem { padding: 3px 0; border-bottom: 1px dashed var(--border); font-size: 12.5px; }
-  tr.clickable { cursor: pointer; }
+  tr.clickable { cursor: pointer; transition: background-color .15s ease; }
   tr.clickable:hover { background: rgba(122,162,247,.08); }
-  .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6);
-                     z-index: 100; align-items: flex-start; justify-content: center;
-                     overflow-y: auto; padding: 40px 16px; }
-  .modal-backdrop.open { display: flex; }
+  tr.clickable:active { background: rgba(122,162,247,.16); }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0);
+                     z-index: 100; display: flex; align-items: flex-start; justify-content: center;
+                     overflow-y: auto; padding: 40px 16px;
+                     opacity: 0; visibility: hidden; pointer-events: none;
+                     transition: opacity .28s cubic-bezier(.32,.72,0,1), background-color .28s ease,
+                                 backdrop-filter .28s ease, visibility 0s linear .28s; }
+  .modal-backdrop.open { opacity: 1; visibility: visible; pointer-events: auto;
+                          background: rgba(0,0,0,.6);
+                          -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+                          transition: opacity .28s cubic-bezier(.32,.72,0,1), background-color .28s ease,
+                                      backdrop-filter .28s ease; }
   .modal { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
-           padding: 20px; max-width: 720px; width: 100%; }
+           padding: 20px; max-width: 720px; width: 100%;
+           box-shadow: 0 4px 8px rgba(0,0,0,.28), 0 24px 48px rgba(0,0,0,.32);
+           transform: scale(.94) translateY(8px); opacity: 0;
+           transition: transform .32s cubic-bezier(.2,.9,.25,1.05), opacity .24s ease; }
+  .modal-backdrop.open .modal { transform: scale(1) translateY(0); opacity: 1; }
   .modal-head { display: flex; justify-content: space-between; align-items: flex-start; }
   .modal-close { background: none; border: none; color: var(--muted); font-size: 20px;
-                 cursor: pointer; line-height: 1; padding: 0 4px; }
+                 cursor: pointer; line-height: 1; padding: 0 4px;
+                 transition: transform .1s ease-out, color .2s ease; }
   .modal-close:hover { color: var(--text); }
+  .modal-close:active { transform: scale(0.9); }
   .modal h2 { margin: 0 0 2px; font-size: 18px; color: var(--text); }
   .rangebar { display: flex; gap: 6px; margin: 14px 0 10px; }
   .rangebtn { padding: 4px 12px; border-radius: 7px; border: 1px solid var(--border);
-              background: var(--bg); color: var(--muted); cursor: pointer; font-size: 12.5px; }
+              background: var(--bg); color: var(--muted); cursor: pointer; font-size: 12.5px;
+              transition: transform .1s ease-out, background-color .2s ease, border-color .2s ease, color .2s ease; }
   .rangebtn.active { background: var(--accent); color: #0f1117; border-color: var(--accent); }
+  .rangebtn:active { transform: scale(0.94); }
   .modal canvas { max-height: 280px; }
   .modal table { margin-top: 4px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tab, .langbtn, .rangebtn, .segbtn, .modal-close, tr.clickable { transition: background-color .15s ease, color .15s ease !important; }
+    .tab:active, .langbtn:active, .rangebtn:active, .segbtn:active, .modal-close:active { transform: none !important; }
+    .modal-backdrop, .modal { transition: opacity .18s ease !important; transform: none !important; }
+  }
+  @media (prefers-reduced-transparency: reduce) {
+    .header { background: var(--bg); backdrop-filter: none; -webkit-backdrop-filter: none; }
+    .modal-backdrop.open { background: rgba(0,0,0,.9); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  }
 </style>
 </head>
 <body>
@@ -79,10 +123,10 @@
   </div>
 
   <h2 id="t-navtitle"></h2>
-  <div class="card"><canvas id="navChart"></canvas></div>
   <div class="card" id="compareTable"></div>
 
   <div class="tabs" id="tabs"></div>
+  <div class="segmented" id="viewSwitch"></div>
   <div id="agentView"></div>
 </div>
 
@@ -111,8 +155,11 @@ const I18N = {
     navtitle: "NAV comparison (all agents)",
     c_agent: "agent", c_nav: "NAV", c_cash: "cash", c_posval: "positions",
     c_deposited: "deposited", c_fees: "fees", c_return: "return",
+    nav_overview: "Overview", nav_decisions: "Decisions",
     pos_title: "Positions — ", c_stock: "stock", c_qty: "qty", c_avgcost: "avg cost",
     c_price: "price", c_value: "value", c_pnl: "P/L", empty_pos: "(no positions)",
+    closed_title: "Closed positions — ", c_realized: "P/L", c_realizedpct: "P/L %",
+    c_closedat: "closed", empty_closed: "(no closed positions yet)",
     dec_title: "Daily decisions (analysis / reasoning / orders)",
     l_analysis: "Analysis", l_reasoning: "Full reasoning", l_memo: "📝 Memo to future self",
     l_orders: "Orders", hold: "Chose to hold — no orders", rec: "★ Recommends watching: ",
@@ -130,8 +177,11 @@ const I18N = {
     navtitle: "NAV 对比(所有 agent)",
     c_agent: "agent", c_nav: "NAV", c_cash: "现金", c_posval: "持仓市值",
     c_deposited: "累计入金", c_fees: "手续费", c_return: "总收益",
+    nav_overview: "总览", nav_decisions: "决策记录",
     pos_title: "持仓 — ", c_stock: "股票", c_qty: "数量", c_avgcost: "成本价",
     c_price: "现价", c_value: "市值", c_pnl: "持仓涨幅", empty_pos: "(空仓)",
+    closed_title: "已平仓 — ", c_realized: "盈亏", c_realizedpct: "盈亏 %",
+    c_closedat: "平仓日期", empty_closed: "(暂无已平仓记录)",
     dec_title: "每日决策(分析 / 推理 / 订单)",
     l_analysis: "分析", l_reasoning: "完整推理过程", l_memo: "📝 给未来自己的备忘",
     l_orders: "订单", hold: "当日选择观望,无订单", rec: "★ 推荐加入观察:",
@@ -154,32 +204,9 @@ const cls = n => n == null ? "" : (n >= 0 ? "pos" : "neg");
 const sign = n => n == null ? "–" : (n >= 0 ? "+" : "") + fmt(n);
 const esc = s => (s || "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
-// --- comparison chart (built once; labels don't need re-render) ---
-const palette = ["#7aa2f7", "#e0af68", "#9ece6a", "#f7768e", "#bb9af7"];
-new Chart(document.getElementById("navChart"), {
-  type: "line",
-  data: {
-    labels: [...new Set(DATA.agents.flatMap(a => a.nav_history.map(h => h.date)))].sort(),
-    datasets: DATA.agents.map((a, i) => ({
-      label: a.name,
-      data: a.nav_history.map(h => ({x: h.date, y: h.nav})),
-      borderColor: palette[i % palette.length],
-      backgroundColor: palette[i % palette.length],
-      tension: .25, pointRadius: 3,
-    })),
-  },
-  options: {
-    parsing: {xAxisKey: "x", yAxisKey: "y"},
-    scales: {
-      x: {type: "category", grid: {color: "#262a35"}, ticks: {color: "#8b91a0"}},
-      y: {grid: {color: "#262a35"}, ticks: {color: "#8b91a0", callback: v => fmt(v,0) + " €"}},
-    },
-    plugins: {legend: {labels: {color: "#e6e8ee"}}},
-  },
-});
-
 // --- tabs ---
 let activeAgent = DATA.agents.length ? DATA.agents[0] : null;
+let activeView = "overview"; // "overview" | "decisions" — independent of which agent is selected
 const tabsEl = document.getElementById("tabs");
 DATA.agents.forEach((a, i) => {
   const b = document.createElement("button");
@@ -189,6 +216,15 @@ DATA.agents.forEach((a, i) => {
                       b.classList.add("active"); activeAgent = a; render(); };
   tabsEl.appendChild(b);
 });
+
+function renderViewSwitch() {
+  const el = document.getElementById("viewSwitch");
+  el.innerHTML = ["overview", "decisions"].map(v =>
+    `<button class="segbtn${v === activeView ? " active" : ""}" data-view="${v}">${t("nav_" + v)}</button>`
+  ).join("");
+  el.querySelectorAll(".segbtn").forEach(b =>
+    b.onclick = () => { activeView = b.dataset.view; render(); });
+}
 
 function renderCompare() {
   document.getElementById("compareTable").innerHTML = `
@@ -206,15 +242,8 @@ function renderCompare() {
     </tr>`).join("")}</table>`;
 }
 
-function render() {
-  document.getElementById("meta").textContent = t("meta_pre") + DATA.generated_at + t("meta_suf");
-  document.getElementById("t-navtitle").textContent = t("navtitle");
-  renderCompare();
-
-  const el = document.getElementById("agentView");
-  const a = activeAgent;
-  if (!a) { el.innerHTML = ""; return; }
-  el.innerHTML = `
+function renderOverviewHTML(a) {
+  return `
     <h2>${t("pos_title")}${esc(a.name)}</h2>
     <div class="card">
       ${a.positions.length ? `<table>
@@ -230,27 +259,19 @@ function render() {
         </tr>`).join("")}</table>` : `<span class="muted">${t("empty_pos")}</span>`}
     </div>
 
-    <h2>${t("dec_title")}</h2>
-    ${a.decisions.map(d => {
-      const dc = d[LANG] || d.en || d.zh || {};   // agent content follows the language toggle
-      const orders = dc.orders || [];
-      const adds = (dc.watchlist_changes && dc.watchlist_changes.add) || [];
-      return `
-      <div class="card">
-        <span class="pill">${esc(d.created_at || d.date)}</span>
-        <span class="pill">${esc(d.model || "")}</span>
-        <div class="decision"><b>${t("l_analysis")}</b><br>${esc(dc.analysis)}</div>
-        ${dc.reasoning ? `<details open><summary>${t("l_reasoning")}</summary>
-          <div class="decision">${esc(dc.reasoning)}</div></details>` : ""}
-        ${dc.memo ? `<div class="decision"><b>${t("l_memo")}</b><br>${esc(dc.memo)}</div>` : ""}
-        ${orders.length ? `<h3>${t("l_orders")}</h3>${orders.map(o => `
-          <div>· <b class="${o.action}">${o.action.toUpperCase()}</b> ${esc(o.ticker)}
-          ${o.eur ? fmt(o.eur) + " €" : ""}${o.qty ? esc(String(o.qty)) + t("shares") : ""}
-          <div class="reason">${esc(o.reason)}</div></div>`).join("")}`
-          : `<div class="muted">${t("hold")}</div>`}
-        ${adds.map(w =>
-          `<div>${t("rec")}<b>${esc(w.ticker)}</b> <span class="reason">${esc(w.reason)}</span></div>`).join("")}
-      </div>`; }).join("") || `<div class="card muted">${t("no_dec")}</div>`}
+    <h2>${t("closed_title")}${esc(a.name)}</h2>
+    <div class="card">
+      ${a.closed_positions.length ? `<table>
+        <tr><th>${t("c_stock")}</th><th class="num">${t("c_realized")}</th><th class="num">${t("c_realizedpct")}</th>
+        <th class="num">${t("c_fees")}</th><th>${t("c_closedat")}</th></tr>
+        ${a.closed_positions.map(c => `<tr class="clickable" onclick="openStockModal('${esc(c.ticker)}')">
+          <td><b>${esc(c.ticker)}</b></td>
+          <td class="num ${cls(c.realized_pnl)}">${sign(c.realized_pnl)} €</td>
+          <td class="num ${cls(c.realized_pct)}"><b>${sign(c.realized_pct)}%</b></td>
+          <td class="num">${fmt(c.fees)} €</td>
+          <td class="muted">${esc(c.closed_at).replace("T", " ")}</td>
+        </tr>`).join("")}</table>` : `<span class="muted">${t("empty_closed")}</span>`}
+    </div>
 
     <h2>${t("trades_title")}</h2>
     <div class="card">
@@ -281,6 +302,43 @@ function render() {
         `<div class="newsitem"><span class="pill">${esc(n.ticker) || t("news_market")}</span> ${esc(n.headline)}</div>`).join("")
        : `<span class="muted">${t("empty_news")}</span>`}
     </div>`;
+}
+
+function renderDecisionsHTML(a) {
+  return `
+    <h2>${t("dec_title")}</h2>
+    ${a.decisions.map(d => {
+      const dc = d[LANG] || d.en || d.zh || {};   // agent content follows the language toggle
+      const orders = dc.orders || [];
+      const adds = (dc.watchlist_changes && dc.watchlist_changes.add) || [];
+      return `
+      <div class="card">
+        <span class="pill">${esc(d.created_at || d.date)}</span>
+        <span class="pill">${esc(d.model || "")}</span>
+        <div class="decision"><b>${t("l_analysis")}</b><br>${esc(dc.analysis)}</div>
+        ${dc.reasoning ? `<details><summary>${t("l_reasoning")}</summary>
+          <div class="decision">${esc(dc.reasoning)}</div></details>` : ""}
+        ${dc.memo ? `<div class="decision"><b>${t("l_memo")}</b><br>${esc(dc.memo)}</div>` : ""}
+        ${orders.length ? `<h3>${t("l_orders")}</h3>${orders.map(o => `
+          <div>· <b class="${o.action}">${o.action.toUpperCase()}</b> ${esc(o.ticker)}
+          ${o.eur ? fmt(o.eur) + " €" : ""}${o.qty ? esc(String(o.qty)) + t("shares") : ""}
+          <div class="reason">${esc(o.reason)}</div></div>`).join("")}`
+          : `<div class="muted">${t("hold")}</div>`}
+        ${adds.map(w =>
+          `<div>${t("rec")}<b>${esc(w.ticker)}</b> <span class="reason">${esc(w.reason)}</span></div>`).join("")}
+      </div>`; }).join("") || `<div class="card muted">${t("no_dec")}</div>`}`;
+}
+
+function render() {
+  document.getElementById("meta").textContent = t("meta_pre") + DATA.generated_at + t("meta_suf");
+  document.getElementById("t-navtitle").textContent = t("navtitle");
+  renderCompare();
+  renderViewSwitch();
+
+  const el = document.getElementById("agentView");
+  const a = activeAgent;
+  if (!a) { el.innerHTML = ""; return; }
+  el.innerHTML = activeView === "decisions" ? renderDecisionsHTML(a) : renderOverviewHTML(a);
 }
 
 // --- stock detail modal ---
