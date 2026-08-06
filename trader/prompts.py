@@ -17,8 +17,7 @@ Trading policy (how a professional runs this book):
   trade when you have an actual reason; holding is often the right call.
 
 Mechanics:
-- Currency is EUR. Each trading day 300 EUR is added to your cash. Unused cash
-  carries over; you are NOT required to trade every day.
+- {budget_line}
 - Every executed order (buy or sell) costs a 1 EUR flat fee (like Trade Republic).
 - Fractional shares are allowed. You may only sell shares you hold.
 - Total buy spending today must not exceed available cash.
@@ -73,9 +72,10 @@ def build_prompt(now_local: str, cash: float, portfolio_lines: list[str],
                  market_news_lines: list[str], watchlist_lines: list[str],
                  history_lines: list[str], nav_lines: list[str],
                  memory_lines: list[str] | None = None,
+                 budget_line: str = "",
                  trigger: str | None = None) -> str:
     parts = [
-        SYSTEM_RULES,
+        SYSTEM_RULES.replace("{budget_line}", budget_line),
         f"\n## Decision time (local, Germany): {now_local}",
         f"Available cash: {cash:.2f} EUR",
     ]

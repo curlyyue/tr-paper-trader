@@ -51,12 +51,22 @@ class DailyPipeline:
                 return
             print(f"[warn] daily decision for {day} already exists; --force given, running again.")
 
-        # 1. Daily budget (idempotent per day)
+        # 1. Budget top-up (idempotent per period)
         if not dry_run:
-            if self.repo.deposit_daily_budget(day, now_iso, self.settings.daily_budget):
-                print(f"Credited {self.settings.daily_budget} EUR daily budget.")
+            if self.settings.budget_period == "monthly":
+                if self.repo.deposit_initial_cash(now_iso, self.settings.initial_cash):
+                    print(f"Credited {self.settings.initial_cash} EUR initial budget.")
+                month = day[:7]
+                if self.settings.monthly_budget and month >= (self.settings.monthly_start or month)[:7]:
+                    if self.repo.deposit_monthly_budget(month, now_iso, self.settings.monthly_budget):
+                        print(f"Credited {self.settings.monthly_budget} EUR monthly budget for {month}.")
+                    else:
+                        print(f"Monthly budget for {month} already credited.")
             else:
-                print("Budget already credited today.")
+                if self.repo.deposit_daily_budget(day, now_iso, self.settings.daily_budget):
+                    print(f"Credited {self.settings.daily_budget} EUR daily budget.")
+                else:
+                    print("Budget already credited today.")
         cash = self.repo.cash_balance()
         print(f"Cash: {cash:.2f} EUR")
 
@@ -174,9 +184,20 @@ class DailyPipeline:
             note = body.get("memo") or body.get("analysis")
             if note:
                 memory_lines.append(f"[{r['created_at'][:16]}] {note}")
+        if self.settings.budget_period == "monthly":
+            budget_line = (
+                f"Currency is EUR. You started with a lump sum and {self.settings.monthly_budget:.0f} "
+                "EUR is added once at the start of each calendar month. Unused cash carries over; "
+                "you are NOT required to trade every run — size positions for a monthly, not daily, cadence."
+            )
+        else:
+            budget_line = (
+                f"Currency is EUR. Each trading day {self.settings.daily_budget:.0f} EUR is added to "
+                "your cash. Unused cash carries over; you are NOT required to trade every day."
+            )
         return build_prompt(now_human, cash, portfolio_lines, quote_lines,
                             news_lines, market_news_lines, watchlist_lines,
-                            history_lines, nav_lines, memory_lines, trigger)
+                            history_lines, nav_lines, memory_lines, budget_line, trigger)
 
 
 def build_pipeline(settings: Settings) -> DailyPipeline:

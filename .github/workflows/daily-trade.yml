@@ -70,12 +70,14 @@ jobs:
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
           echo "Running mode: $MODE"
 
-      - name: Run agents (opus + haiku)
+      - name: Run agents (opus + opus_monthly + haiku + haiku_monthly)
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
         run: |
           python ${{ steps.task.outputs.cmd }} --model opus  ${{ steps.task.outputs.args }} || echo "opus run failed"
+          python ${{ steps.task.outputs.cmd }} --model opus --agent opus_monthly ${{ steps.task.outputs.args }} || echo "opus_monthly run failed"
           python ${{ steps.task.outputs.cmd }} --model haiku ${{ steps.task.outputs.args }} || echo "haiku run failed"
+          python ${{ steps.task.outputs.cmd }} --model haiku --agent haiku_monthly ${{ steps.task.outputs.args }} || echo "haiku_monthly run failed"
 
       - name: Build dashboard
         run: python dashboard.py

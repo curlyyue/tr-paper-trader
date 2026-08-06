@@ -2,6 +2,20 @@
   "daily_budget_eur": 300,
   "fee_per_trade_eur": 1.0,
   "model": "opus",
+  "agents": {
+    "opus_monthly": {
+      "budget_period": "monthly",
+      "initial_cash_eur": 3000,
+      "monthly_budget_eur": 1000,
+      "monthly_start": "2026-09-01"
+    },
+    "haiku_monthly": {
+      "budget_period": "monthly",
+      "initial_cash_eur": 3000,
+      "monthly_budget_eur": 1000,
+      "monthly_start": "2026-09-01"
+    }
+  },
   "monitor": {
     "held_move_pct": 5.0,
     "watch_move_pct": 8.0,

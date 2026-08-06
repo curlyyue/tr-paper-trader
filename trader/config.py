@@ -23,7 +23,11 @@ class Settings:
     agent_name: str
     model: str            # alias ("opus") or full id ("claude-opus-4-8")
     backend: str          # "cli" | "api"
-    daily_budget: float
+    budget_period: str    # "daily" | "monthly"
+    daily_budget: float   # used when budget_period == "daily"
+    initial_cash: float   # one-time credit, used when budget_period == "monthly"
+    monthly_budget: float          # recurring credit, used when budget_period == "monthly"
+    monthly_start: str | None      # "YYYY-MM-DD"; recurring credit starts this month
     fee: float
     watchlist: tuple[str, ...]
     holidays: frozenset[str]
@@ -51,11 +55,17 @@ def load_settings(model: str | None = None, agent: str | None = None,
     if backend == "api" and not os.getenv("ANTHROPIC_API_KEY"):
         raise ValueError("TRADER_BACKEND=api requires ANTHROPIC_API_KEY in .env")
 
+    agent_cfg = cfg.get("agents", {}).get(agent, {})
+
     return Settings(
         agent_name=agent,
         model=model,
         backend=backend,
+        budget_period=agent_cfg.get("budget_period", "daily"),
         daily_budget=float(cfg["daily_budget_eur"]),
+        initial_cash=float(agent_cfg.get("initial_cash_eur", 0)),
+        monthly_budget=float(agent_cfg.get("monthly_budget_eur", 0)),
+        monthly_start=agent_cfg.get("monthly_start"),
         fee=float(cfg["fee_per_trade_eur"]),
         watchlist=tuple(cfg["watchlist"]),
         holidays=frozenset(cfg["market_holidays"]),

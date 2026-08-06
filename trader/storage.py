@@ -94,6 +94,38 @@ class Repository:
         self.conn.commit()
         return True
 
+    def deposit_initial_cash(self, ts: str, amount: float) -> bool:
+        """Credit the one-time starting budget; returns False if already done."""
+        dup = self.conn.execute(
+            "SELECT 1 FROM cash_ledger WHERE type = 'deposit' AND note = 'initial budget'"
+        ).fetchone()
+        if dup:
+            return False
+        self.conn.execute(
+            "INSERT INTO cash_ledger (date, ts, type, amount, note) "
+            "VALUES (?, ?, 'deposit', ?, 'initial budget')",
+            (ts[:10], ts, amount),
+        )
+        self.conn.commit()
+        return True
+
+    def deposit_monthly_budget(self, month: str, ts: str, amount: float) -> bool:
+        """Credit the recurring budget once per calendar month (month = 'YYYY-MM');
+        returns False if already done."""
+        dup = self.conn.execute(
+            "SELECT 1 FROM cash_ledger WHERE date = ? AND type = 'deposit' AND note = 'monthly budget'",
+            (month,),
+        ).fetchone()
+        if dup:
+            return False
+        self.conn.execute(
+            "INSERT INTO cash_ledger (date, ts, type, amount, note) "
+            "VALUES (?, ?, 'deposit', ?, 'monthly budget')",
+            (month, ts, amount),
+        )
+        self.conn.commit()
+        return True
+
     def deposits_total(self) -> float:
         return self.conn.execute(
             "SELECT COALESCE(SUM(amount), 0) AS s FROM cash_ledger WHERE type = 'deposit'"
