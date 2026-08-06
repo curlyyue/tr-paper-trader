@@ -16,6 +16,7 @@ class YFinanceNews:
     # Broad queries for stock discovery beyond the watchlist
     MARKET_TOPICS = (
         "stock market today biggest movers",
+        "S&P 500 Nasdaq stock movers",
         "DAX MDAX Aktien news",
         "earnings beat stock surge",
     )
