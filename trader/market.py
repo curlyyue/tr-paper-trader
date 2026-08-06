@@ -65,3 +65,21 @@ class YFinanceMarket:
             if q:
                 result[tk] = q
         return result
+
+    def history(self, ticker: str, period: str = "2y") -> list[dict]:
+        """Daily close price series in EUR, for dashboard charting."""
+        try:
+            t = yf.Ticker(ticker)
+            hist = t.history(period=period)
+            if hist.empty:
+                return []
+            currency = t.fast_info.get("currency") or "EUR"
+            fx = self._fx_to_eur(currency)
+            closes = hist["Close"].dropna()
+            return [
+                {"date": ts.strftime("%Y-%m-%d"), "close": round(float(price) * fx, 4)}
+                for ts, price in closes.items()
+            ]
+        except Exception as e:
+            print(f"  [warn] history failed for {ticker}: {e}")
+            return []

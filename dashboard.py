@@ -98,9 +98,15 @@ def collect_agent(db_file: Path, market: YFinanceMarket) -> dict:
 def main():
     market = YFinanceMarket()
     agents = [collect_agent(f, market) for f in sorted(DATA_DIR.glob("*.db"))]
+
+    tickers = sorted({p["ticker"] for a in agents for p in a["positions"]}
+                      | {tr["ticker"] for a in agents for tr in a["trades"]})
+    price_history = {tk: h for tk in tickers if (h := market.history(tk))}
+
     data = {
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "agents": agents,
+        "price_history": price_history,
     }
     OUT_DIR.mkdir(exist_ok=True)
     template = (ROOT / "dashboard_template.html").read_text()

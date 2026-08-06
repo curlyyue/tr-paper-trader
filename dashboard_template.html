@@ -44,6 +44,25 @@
   .langbtn.active { background: var(--accent); color: #0f1117; border-color: var(--accent); }
   canvas { max-height: 320px; }
   .newsitem { padding: 3px 0; border-bottom: 1px dashed var(--border); font-size: 12.5px; }
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover { background: rgba(122,162,247,.08); }
+  .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6);
+                     z-index: 100; align-items: flex-start; justify-content: center;
+                     overflow-y: auto; padding: 40px 16px; }
+  .modal-backdrop.open { display: flex; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+           padding: 20px; max-width: 720px; width: 100%; }
+  .modal-head { display: flex; justify-content: space-between; align-items: flex-start; }
+  .modal-close { background: none; border: none; color: var(--muted); font-size: 20px;
+                 cursor: pointer; line-height: 1; padding: 0 4px; }
+  .modal-close:hover { color: var(--text); }
+  .modal h2 { margin: 0 0 2px; font-size: 18px; color: var(--text); }
+  .rangebar { display: flex; gap: 6px; margin: 14px 0 10px; }
+  .rangebtn { padding: 4px 12px; border-radius: 7px; border: 1px solid var(--border);
+              background: var(--bg); color: var(--muted); cursor: pointer; font-size: 12.5px; }
+  .rangebtn.active { background: var(--accent); color: #0f1117; border-color: var(--accent); }
+  .modal canvas { max-height: 280px; }
+  .modal table { margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -67,6 +86,22 @@
   <div id="agentView"></div>
 </div>
 
+<div class="modal-backdrop" id="stockModalBackdrop">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h2 id="modalTicker"></h2>
+        <div class="muted" id="modalSub"></div>
+      </div>
+      <button class="modal-close" id="modalClose">&times;</button>
+    </div>
+    <div class="rangebar" id="modalRangeBar"></div>
+    <canvas id="modalChart"></canvas>
+    <h3 id="modalTradesTitle"></h3>
+    <div id="modalTrades"></div>
+  </div>
+</div>
+
 <script>
 const DATA = /*__DATA__*/;
 
@@ -83,6 +118,9 @@ const I18N = {
     l_orders: "Orders", hold: "Chose to hold — no orders", rec: "★ Recommends watching: ",
     trades_title: "Trade log", c_time: "time", c_side: "side", c_reason: "reason",
     empty_trades: "(no trades)", shares: " sh",
+    modal_trades: "Trades", modal_notrades: "(no trades for this stock yet)",
+    modal_noprice: "(no price history available)", modal_avg: "avg cost ",
+    r_1w: "1W", r_1m: "1M", r_3m: "3M", r_6m: "6M", r_1y: "1Y", r_max: "MAX",
     disc_title: "Agent-discovered stocks (recommendations)", empty_disc: "(none yet)",
     news_title: "News the agent saw (archive)", news_market: "market",
     empty_news: "(archived from the next run on)", added: "added ", no_dec: "(no decisions yet)",
@@ -99,6 +137,9 @@ const I18N = {
     l_orders: "订单", hold: "当日选择观望,无订单", rec: "★ 推荐加入观察:",
     trades_title: "交易记录", c_time: "时间", c_side: "方向", c_reason: "理由",
     empty_trades: "(无交易)", shares: " 股",
+    modal_trades: "交易记录", modal_notrades: "(该股票暂无交易)",
+    modal_noprice: "(暂无价格历史数据)", modal_avg: "平均成本 ",
+    r_1w: "1周", r_1m: "1月", r_3m: "3月", r_6m: "6月", r_1y: "1年", r_max: "最大",
     disc_title: "Agent 发现的股票(推荐)", empty_disc: "(暂无)",
     news_title: "Agent 看到的新闻(存档)", news_market: "市场",
     empty_news: "(下次运行起开始存档)", added: "加入于 ", no_dec: "(暂无决策记录)",
@@ -179,7 +220,7 @@ function render() {
       ${a.positions.length ? `<table>
         <tr><th>${t("c_stock")}</th><th class="num">${t("c_qty")}</th><th class="num">${t("c_avgcost")}</th>
         <th class="num">${t("c_price")}</th><th class="num">${t("c_value")}</th><th class="num">${t("c_pnl")}</th></tr>
-        ${a.positions.map(p => `<tr>
+        ${a.positions.map(p => `<tr class="clickable" onclick="openStockModal('${esc(p.ticker)}')">
           <td><b>${esc(p.ticker)}</b></td>
           <td class="num">${fmt(p.qty, 4)}</td>
           <td class="num">${fmt(p.avg_cost)} €</td>
@@ -216,7 +257,7 @@ function render() {
       ${a.trades.length ? `<table>
         <tr><th>${t("c_time")}</th><th>${t("c_side")}</th><th>${t("c_stock")}</th><th class="num">${t("c_qty")}</th>
         <th class="num">${t("c_price")}</th><th>${t("c_reason")}</th></tr>
-        ${a.trades.map(tr => `<tr>
+        ${a.trades.map(tr => `<tr class="clickable" onclick="openStockModal('${esc(tr.ticker)}')">
           <td class="muted">${esc(tr.executed_at).replace("T", " ")}</td>
           <td class="${tr.side}"><b>${tr.side.toUpperCase()}</b></td>
           <td>${esc(tr.ticker)}</td>
@@ -240,6 +281,123 @@ function render() {
         `<div class="newsitem"><span class="pill">${esc(n.ticker) || t("news_market")}</span> ${esc(n.headline)}</div>`).join("")
        : `<span class="muted">${t("empty_news")}</span>`}
     </div>`;
+}
+
+// --- stock detail modal ---
+const RANGES = [
+  {key: "1w", days: 7}, {key: "1m", days: 30}, {key: "3m", days: 90},
+  {key: "6m", days: 180}, {key: "1y", days: 365}, {key: "max", days: Infinity},
+];
+let modalChart = null;
+let modalState = null; // {ticker, history, trades, range}
+
+function openStockModal(ticker) {
+  const history = DATA.price_history[ticker] || [];
+  const trades = (activeAgent ? activeAgent.trades : []).filter(tr => tr.ticker === ticker);
+  const pos = activeAgent ? activeAgent.positions.find(p => p.ticker === ticker) : null;
+  modalState = {ticker, history, trades, range: "1y"};
+  document.getElementById("modalTicker").textContent = ticker;
+  document.getElementById("modalSub").textContent = pos
+    ? `${t("modal_avg")}${fmt(pos.avg_cost)} € · ${fmt(pos.qty, 4)}${t("shares")}` : "";
+  document.getElementById("modalRangeBar").innerHTML = RANGES.map(r =>
+    `<button class="rangebtn${r.key === modalState.range ? " active" : ""}" data-range="${r.key}">${t("r_" + r.key)}</button>`
+  ).join("");
+  document.querySelectorAll("#modalRangeBar .rangebtn").forEach(b =>
+    b.onclick = () => { modalState.range = b.dataset.range;
+      document.querySelectorAll("#modalRangeBar .rangebtn").forEach(x => x.classList.remove("active"));
+      b.classList.add("active"); renderModalChart(); });
+  renderModalChart();
+  renderModalTrades();
+  document.getElementById("stockModalBackdrop").classList.add("open");
+}
+
+function closeStockModal() {
+  document.getElementById("stockModalBackdrop").classList.remove("open");
+}
+document.getElementById("modalClose").onclick = closeStockModal;
+document.getElementById("stockModalBackdrop").onclick = e => {
+  if (e.target.id === "stockModalBackdrop") closeStockModal();
+};
+
+function renderModalChart() {
+  const {history, trades, range} = modalState;
+  const days = RANGES.find(r => r.key === range).days;
+  const cutoff = days === Infinity ? null
+    : new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+  const points = cutoff ? history.filter(h => h.date >= cutoff) : history;
+  const labels = points.map(h => h.date);
+  const labelSet = new Set(labels);
+
+  const buys = trades.filter(tr => tr.side === "buy" && labelSet.has(tr.executed_at.slice(0, 10)))
+    .map(tr => ({x: tr.executed_at.slice(0, 10), y: tr.price, tr}));
+  const sells = trades.filter(tr => tr.side === "sell" && labelSet.has(tr.executed_at.slice(0, 10)))
+    .map(tr => ({x: tr.executed_at.slice(0, 10), y: tr.price, tr}));
+
+  if (modalChart) modalChart.destroy();
+  const ctx = document.getElementById("modalChart");
+  if (!points.length) {
+    ctx.getContext("2d").clearRect(0, 0, ctx.width, ctx.height);
+    modalChart = null;
+    return;
+  }
+  modalChart = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: modalState.ticker, data: points.map(h => h.close),
+          borderColor: "#7aa2f7", backgroundColor: "rgba(122,162,247,.12)",
+          fill: true, tension: .2, pointRadius: 0, borderWidth: 2, order: 3,
+        },
+        {
+          type: "scatter", label: "buy", data: buys,
+          backgroundColor: "#34d399", pointStyle: "triangle", rotation: 0,
+          pointRadius: 6, pointHoverRadius: 8, showLine: false, order: 1,
+        },
+        {
+          type: "scatter", label: "sell", data: sells,
+          backgroundColor: "#f87171", pointStyle: "triangle", rotation: 180,
+          pointRadius: 6, pointHoverRadius: 8, showLine: false, order: 2,
+        },
+      ],
+    },
+    options: {
+      parsing: {xAxisKey: "x", yAxisKey: "y"},
+      scales: {
+        x: {type: "category", grid: {color: "#262a35"}, ticks: {color: "#8b91a0", maxTicksLimit: 10}},
+        y: {grid: {color: "#262a35"}, ticks: {color: "#8b91a0", callback: v => fmt(v, 2) + " €"}},
+      },
+      plugins: {
+        legend: {display: false},
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const tr = ctx.raw && ctx.raw.tr;
+              if (tr) return `${tr.side.toUpperCase()} ${fmt(tr.qty, 4)} @ ${fmt(tr.price)} €`
+                + (tr.reason ? ` — ${tr.reason}` : "");
+              return `${fmt(ctx.parsed.y)} €`;
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+function renderModalTrades() {
+  document.getElementById("modalTradesTitle").textContent = t("modal_trades");
+  const {trades} = modalState;
+  document.getElementById("modalTrades").innerHTML = trades.length ? `<table>
+    <tr><th>${t("c_time")}</th><th>${t("c_side")}</th><th class="num">${t("c_qty")}</th>
+    <th class="num">${t("c_price")}</th><th>${t("c_reason")}</th></tr>
+    ${trades.map(tr => `<tr>
+      <td class="muted">${esc(tr.executed_at).replace("T", " ")}</td>
+      <td class="${tr.side}"><b>${tr.side.toUpperCase()}</b></td>
+      <td class="num">${fmt(tr.qty, 4)}</td>
+      <td class="num">${fmt(tr.price)} €</td>
+      <td class="reason">${esc(tr.reason)}</td>
+    </tr>`).join("")}</table>` : `<span class="muted">${t("modal_notrades")}</span>`;
 }
 
 // --- language switch ---
